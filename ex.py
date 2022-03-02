@@ -10,31 +10,31 @@ import numpy as np
 #                  use this flag. If not, you might get an error!'
 #                  Specifically desgin to display summary files'
 
-import sys
 from os import listdir
 from os.path import isfile, isdir, join
+import json
 
 def ex_dir():
     if len(sys.argv) < 2:
-        print('USE:\npython3 ex_dir.py -dir <DIR>')
+        print('USE:\npython3 ex.py -dir <DIR>')
         sys.exit(0)
     dir_ = sys.argv[1]
     if not isdir(dir_):
         print('ERROR: dir',dir_,'does not exist.')
         sys.exit(0)
     files = [join(dir_,f) for f in listdir(dir_) if isfile(join(dir_, f))]
-    for f in files:
+    for i,f in enumerate(files):
         print(f'Filename: {f}\n')
         extract(f, 0, '')
+    print(f'------------ Extracted {i} files ----------------')
 
 def main():
     # help menu
     if len(sys.argv) < 2:
-        print('USE:\npython3 display_song.py [FLAGS] <HDF5 file> <OPT: song idx> <OPT: getter>')
+        print('USE:\npython3 ex.py [FLAGS] <HDF5 file> <OPT: song idx> <OPT: getter>')
         sys.exit(0)
 
     # flags
-
     summary = False
     while True:
         if sys.argv[1] == '-dir':
@@ -88,6 +88,7 @@ def extract(hdf5path, songidx, onegetter):
         getters = [onegetter]
     getters = np.sort(getters)
 
+    dict_ = {}
     # print them
     for getter in getters:
         try:
@@ -99,13 +100,29 @@ def extract(hdf5path, songidx, onegetter):
                 print(e)
                 print('forgot -summary flag? specified wrong getter?')
         if res.__class__.__name__ == 'ndarray':
-            print(getter[4:]+": shape =",res.shape)
+            #print(getter[4:]+": shape =",res.shape)
+            dict_[getter[4:]] = res.shape
         else:
-            print(getter[4:]+":",res)
+            #print(getter[4:]+":",res)
+            if (res.__class__.__name__ == 'int32'):
+                dict_[getter[4:]] = int(res)
+                continue
+            if (res.__class__.__name__ == 'bytes_'):
+                dict_[getter[4:]] = str(res)
+                continue
+            dict_[getter[4:]] = res
+
+    json_d = json.dumps(dict_)
+    upload(json_d)
 
     # done
     print('DONE, showed song',songidx,'/',numSongs-1,'in file:',hdf5path)
     h5.close()
+
+
+def upload(json_d):
+    print('LOAD')
+    print(json_d)
 
 if __name__ == "__main__":
     print('MAIN\n')
