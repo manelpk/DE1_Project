@@ -2,33 +2,32 @@ import os
 import sys
 import hdf5_getters
 import numpy as np
+from pymongo import MongoClient
 
-# python ex.py [FLAGS] <HDF5 file> <OPT: song idx> <OPT: getter>'
-# python ex.py mysong.h5 0 danceability'
-#   'FLAGS'
-#   -summary     - if you use a file that does not have all fields,'
-#                  use this flag. If not, you might get an error!'
-#                  Specifically desgin to display summary files'
 
-from os import listdir
-from os.path import isfile, isdir, join
-import json
-
-def ex_dir():
+def ex_dir(songs):
     if len(sys.argv) < 2:
         print('USE:\npython3 ex.py -dir <DIR>')
         sys.exit(0)
     dir_ = sys.argv[1]
-    if not isdir(dir_):
+    if not os.path.isdir(dir_):
         print('ERROR: dir',dir_,'does not exist.')
         sys.exit(0)
-    files = [join(dir_,f) for f in listdir(dir_) if isfile(join(dir_, f))]
+    files = [os.path.join(dir_,f) for f in os.listdir(dir_) if os.path.isfile(os.path.join(dir_, f))]
+    toUpload = []
     for i,f in enumerate(files):
-        print(f'Filename: {f}\n')
-        extract(f, 0, '')
-    print(f'------------ Extracted {i} files ----------------')
+        print(f'Processing: {f}\n')
+        toUpload.append(extract(f, 0, ''))
+
+    upload(toUpload, songs)
+    print(f'------------ Processed {i} files ----------------')
 
 def main():
+    dbName = 'deproject'
+    collName = 'songs'
+    mongo_client = MongoClient('mongodb://localhost:27017')
+    db = mongo_client[dbName]
+    songs = db[collName]
     # help menu
     if len(sys.argv) < 2:
         print('USE:\npython3 ex.py [FLAGS] <HDF5 file> <OPT: song idx> <OPT: getter>')
@@ -39,7 +38,7 @@ def main():
     while True:
         if sys.argv[1] == '-dir':
             sys.argv.pop(1)
-            ex_dir()
+            ex_dir(songs)
             sys.exit(0)
 
         if sys.argv[1] == '-summary':
@@ -57,7 +56,8 @@ def main():
     if len(sys.argv) > 3:
         onegetter = sys.argv[3]
 
-    extract(hdf5path, songidx, onegetter)
+    toUpload = extract(hdf5path, songidx, onegetter)
+    upload([toUpload], songs)
 
 def extract(hdf5path, songidx, onegetter):
     # sanity check
@@ -111,18 +111,15 @@ def extract(hdf5path, songidx, onegetter):
                 dict_[getter[4:]] = str(res)
                 continue
             dict_[getter[4:]] = res
-
-    json_d = json.dumps(dict_)
-    upload(json_d)
-
     # done
-    print('DONE, showed song',songidx,'/',numSongs-1,'in file:',hdf5path)
+    #print('DONE, showed song',songidx,'/',numSongs-1,'in file:',hdf5path)
     h5.close()
+    return dict_
 
 
-def upload(json_d):
-    print('LOAD')
-    print(json_d)
+def upload(d, songs):
+    results = songs.insert_many(d)
+    print(f'UPLOADED: {results}')
 
 if __name__ == "__main__":
     print('MAIN\n')
